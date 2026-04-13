@@ -7,13 +7,21 @@ from prompts import SYSTEM_PROMPT
 
 def _extract_json(raw_text: str) -> dict:
     raw_text = raw_text.strip()
+    fenced = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw_text, flags=re.S | re.I)
+    if fenced:
+        raw_text = fenced.group(1).strip()
     try:
         return json.loads(raw_text)
     except json.JSONDecodeError:
-        match = re.search(r"\{.*\}", raw_text, flags=re.S)
+        # JSON obyektning eng katta blokini olish
+        match = re.search(r"\{[\s\S]*\}", raw_text, flags=re.S)
         if not match:
             raise ValueError("AI javobidan JSON topilmadi.")
-        return json.loads(match.group(0))
+        candidate = match.group(0).strip()
+        # Ba'zi modellarda escape qilingan JSON bo'ladi
+        if '\\"' in candidate and candidate.startswith('{"'):
+            candidate = candidate.replace('\\"', '"')
+        return json.loads(candidate)
 
 
 def generate_site_code(user_prompt: str) -> dict:
