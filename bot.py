@@ -7,9 +7,6 @@ from prompts import build_site_prompt
 from ai_engine import generate_site_code
 from site_builder import PAGE_MAP, ensure_temp_root, write_site_files
 
-if not TELEGRAM_BOT_TOKEN:
-    raise ValueError("TELEGRAM_BOT_TOKEN topilmadi. .env ga token kiriting.")
-
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN, parse_mode="HTML")
 user_state = {}
 
@@ -133,4 +130,15 @@ def on_text(message: types.Message):
 
 if __name__ == "__main__":
     print("AI Builder Bot ishga tushdi...")
+    if not TELEGRAM_BOT_TOKEN:
+        print("TELEGRAM_BOT_TOKEN topilmadi. Env variable kiriting.")
+        raise SystemExit(1)
+    bot.infinity_polling(skip_pending=True)
+
+
+def run_bot() -> None:
+    print("AI Builder Bot polling boshlandi...")
+    if not TELEGRAM_BOT_TOKEN:
+        print("TELEGRAM_BOT_TOKEN topilmadi. Bot ishga tushmadi.")
+        return
     bot.infinity_polling(skip_pending=True)
