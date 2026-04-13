@@ -4,7 +4,6 @@ from telebot import types
 
 from config import TELEGRAM_BOT_TOKEN
 from prompts import build_site_prompt
-from ai_engine import generate_site_code
 from site_builder import PAGE_MAP, ensure_temp_root, write_site_files
 
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN, parse_mode="HTML")
@@ -20,48 +19,6 @@ def kb(rows: list[list[str]]) -> types.ReplyKeyboardMarkup:
     for r in rows:
         m.row(*r)
     return m
-
-
-def fallback_site_files(st: dict) -> dict:
-    site_name = st.get("site_name", "Yangi Sayt")
-    color = st.get("color", "🔵 Ko'k")
-    color_map = {
-        "🔵 Ko'k": "#2563eb",
-        "⚫ Qora": "#111827",
-        "🟢 Yashil": "#16a34a",
-        "🔴 Qizil": "#dc2626",
-        "🟣 Binafsha": "#7c3aed",
-    }
-    main = color_map.get(color, "#2563eb")
-
-    pages = PAGE_MAP.get(st.get("pages_count", 1), ["Home"])
-    links = "".join(f'<a href="#{p.lower()}">{p}</a>' for p in pages)
-    sections = "".join(
-        f'<section id="{p.lower()}" class="card"><h2>{p}</h2><p>{site_name} uchun {p} bo\'limi tayyor.</p></section>'
-        for p in pages
-    )
-
-    html = f"""<!doctype html>
-<html lang="uz">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{site_name}</title>
-  <link rel="stylesheet" href="style.css" />
-</head>
-<body>
-  <header class="hero">
-    <h1>{site_name}</h1>
-    <p>{st.get("site_type","Sayt")} · {st.get("design","Zamonaviy")} dizayn</p>
-    <nav>{links}</nav>
-  </header>
-  <main>{sections}</main>
-  <script src="script.js"></script>
-</body>
-</html>"""
-    css = f"""*{{box-sizing:border-box}}body{{font-family:Arial;margin:0;background:#f8fafc;color:#111827}}.hero{{padding:40px;background:{main};color:#fff}}nav a{{color:#fff;margin-right:12px;text-decoration:none}}main{{padding:20px;display:grid;gap:12px}}.card{{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px}}"""
-    js = "document.querySelectorAll('nav a').forEach(a=>a.addEventListener('click',()=>console.log('navigate:',a.getAttribute('href'))));"
-    return {"index_html": html, "style_css": css, "script_js": js}
 
 
 @bot.message_handler(commands=["start"])
@@ -146,19 +103,22 @@ def on_text(message: types.Message):
         if step == "confirm" and text == "✅ Yaratish":
             bot.send_message(chat_id, "⏳ Saytingiz yaratilmoqda...")
             pages = PAGE_MAP[st["pages_count"]]
-            prompt = build_site_prompt(
+            _ = build_site_prompt(
                 site_name=st["site_name"],
                 pages=pages,
                 design=st["design"],
                 color=st["color"],
                 site_type=st["site_type"],
             )
-            try:
-                files = generate_site_code(prompt)
-            except Exception:
-                files = fallback_site_files(st)
             root = ensure_temp_root()
-            zip_path = write_site_files(root, st["site_name"], files)
+            zip_path = write_site_files(
+                root,
+                site_name=st["site_name"],
+                pages=pages,
+                site_type=st["site_type"],
+                design=st["design"],
+                color=st["color"],
+            )
             with open(zip_path, "rb") as f:
                 bot.send_document(chat_id, f, caption="📦 Tayyor! Saytingiz ZIP holatda.")
 
