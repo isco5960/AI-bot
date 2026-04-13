@@ -24,25 +24,41 @@ def generate_site_code(user_prompt: str) -> dict:
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
     }
-    payload = {
-        "model": AI_MODEL,
-        "temperature": 0.4,
-        "max_tokens": 1800,
-        "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt},
-        ],
-    }
+    models = [AI_MODEL, "x-ai/grok-4-mini", "openai/gpt-4o-mini"]
+    token_limits = [900, 600, 400]
+    last_error = "Provider returned error"
 
-    response = requests.post(OPENROUTER_URL, headers=headers, json=payload, timeout=90)
-    data = response.json()
+    for model in models:
+        for max_tokens in token_limits:
+            payload = {
+                "model": model,
+                "temperature": 0.4,
+                "max_tokens": max_tokens,
+                "messages": [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": user_prompt},
+                ],
+            }
 
-    if response.status_code >= 400:
-        msg = data.get("error", {}).get("message", "Noma'lum AI xatolik")
-        raise ValueError(msg)
+            response = requests.post(OPENROUTER_URL, headers=headers, json=payload, timeout=90)
+            data = response.json()
 
-    text = data.get("choices", [{}])[0].get("message", {}).get("content", "")
-    parsed = _extract_json(text)
-    if not all(k in parsed for k in ("index_html", "style_css", "script_js")):
-        raise ValueError("AI javobida kerakli fayl maydonlari to'liq emas.")
-    return parsed
+            if response.status_code >= 400:
+                last_error = data.get("error", {}).get("message", "Noma'lum AI xatolik")
+                # Keyingi model/token bilan qayta urinish
+                continue
+
+            text = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+            try:
+                parsed = _extract_json(text)
+            except Exception:
+                last_error = "AI javobida toza JSON qaytmadi."
+                continue
+
+            if not all(k in parsed for k in ("index_html", "style_css", "script_js")):
+                last_error = "AI javobida kerakli fayl maydonlari to'liq emas."
+                continue
+
+            return parsed
+
+    raise ValueError(last_error)
